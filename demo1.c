@@ -1,0 +1,3 @@
+#define ERROR64_BUILD_DEMO
+#define ERROR64_DEFINE_IMPLEMENTATION
+#include "error64.h"
