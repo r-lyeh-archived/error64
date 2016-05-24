@@ -2,28 +2,32 @@
 
 - [x] Handle custom 64-bit error codes, with extended meta-info.
 - [x] Thread-safe local storage `errno64` variable.
-- [x] Quite flexible error formatting.
-- [x] Many message combinations (see more than 30300 different messages in [demo.c](demo.c))
-- [x] Tiny, cross-platform, header-only.
+- [x] Retrieve error message and error location with ease.
+- [x] Unlimited message combinations ([demo.c](demo.c) features more than 30,000 different message combinations)
+- [x] Tiny, portable, cross-platform, header-only.
 - [x] Public domain.
 
 ### Public API
 ```c++
-int64_t ec1 = ERROR64( attr_enum );             // (see full table in error64.h)
-int64_t ec2 = ERROR64( attr_enum | noun_enum ); // (see full table in error64.h)
 char buf256[256];
-puts( strerror64( buf256, ec2 ) );
+// make error code and print it
+errno64 = ERROR64( ERR_NOT_AVAILABLE );        // (see full table in error64.h)
+puts( strerror64( buf256, errno64 ) );
+// make error code and print it (w/ extended info)
+errno64 = ERROR64( ERR_NOT | ERR_AUTHORIZED ); // (see full table in error64.h)
+puts( strerror64ex( buf256, errno64 ) );
 ```
 
 ### Showcase
 ```c++
 #~> cat sample.c
 
-#include "errno64.h"
-#undef  ERR_VER_NO
 #define ERR_VER_NO 123
-#undef  ERR_REV_NO
 #define ERR_REV_NO 12345
+#define ERROR64_DEFINE_IMPLEMENTATION
+#define ERRNO64_DEFINE_IMPLEMENTATION
+#include "error64.h"
+
 enum {
     AA_BLANK,
     AA_ARGUMENT,
@@ -35,11 +39,13 @@ const char *glossary( int enumeration ) {
     else return "";
 }
 int main() {
+    char buf[256];
+
     errno64 = ERROR64( AA_ARGUMENT | ERR_INVALID );
-    perror64("test1");
+    puts( strerror64ex( buf, errno64 ) );
 
     errno64 = ERROR64( ERR_NO_SUCH | AA_CONSOLE );
-    perror64("test2");
+    puts( strerror64ex( buf, errno64 ) );
 }
 
 #~> g++ sample.c errno64.c error64.c && ./a.out
@@ -48,4 +54,5 @@ test2 : NO SUCH CONSOLE ; ERR_FB30390014268002 error=1,api=123,rev=12345,line=20
 ```
 
 ### Changelog
+- v1.0.1 (2016/05/24): Unified headers: single-header now
 - v1.0.0 (2016/04/03): Initial commit

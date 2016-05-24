@@ -1,7 +1,8 @@
 // Handle custom 64-bit error codes, with extended meta-info.
+// https://github.com/r-lyeh/error64
 // - rlyeh, public domain.
 
-// This header provides the meanings to add extra information to a 64-bit error variable.
+// This header provides the meanings to add extra information to a 64-bit error variable (errno64 also provided).
 // Meta-info includes error-bit flag, API VERSION number, API REVISION number, __LINE__ and error messages.
 //
 // An error message has the form '(NOT) + ADJ/V': "Empty", "Not valid", "Not initialized", "Not running", "Unavailable", etc
@@ -15,21 +16,24 @@
 // E = error-bit           ( 1-bits @ 63) E[0..    1] \
 // V = api version         ( 7-bits @ 56) V[0..  127] |
 // R = api revision        (16-bits @ 40) R[0..65535] | 40-bit locator
-// L = location            (16-bits @ 24) L[0..65535] /  
+// L = location            (16-bits @ 24) L[0..65535] /
 // N = negate-bit          ( 1-bits @ 23) N[0..    1] \
 // A = attribute code      ( 8-bits @ 15) A[0....255] | 24-bit descriptor
-// U = user-defined code   (15-bits @ 00) U[0..32767] / 
+// U = user-defined code   (15-bits @ 00) U[0..32767] /
 //
-// Final note: ERR_VER_NO and ERR_REV_NO must be     #defined in library/engine source files.
-// Final note: ERR_VER_NO and ERR_REV_NO must be not #defined in user code.
+// Note: ERR_VER_NO and ERR_REV_NO must be     #defined in library/engine source files.
+// Note: ERR_VER_NO and ERR_REV_NO must be not #defined in user code.
 
-#pragma once
+#ifndef ERROR64_H
+#define ERROR64_H
+
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define ERROR64_VERSION "1.0.0" // (2016/04/03): Initial commit
+#define ERROR64_VERSION "1.0.1" /* (2016/05/24): Unified headers: single-header now
+#define ERROR64_VERSION "1.0.0" // (2016/04/03): Initial commit */
 
 // Public API:
 
@@ -47,6 +51,19 @@ extern "C" {
 
 // Extract human-readable error message to a [256] char buffer
 const char *strerror64( char buf[256], int64_t errno64 );
+// Extract human-readable error message to a [256] char buffer (extended info)
+const char *strerror64ex( char buf[256], int64_t errno64 );
+
+// Also, provide the meanings to add extra information to a 64-bit, thread-local-safe, errno variable: errno64.
+// Pretty much like errno, errno64 is an writable thread-safe l-value and the implementation of how the l-value is read and written is hidden from the user.
+#ifndef ERR_TLS
+#   if defined(__MINGW32__) || defined(__SUNPRO_C) || defined(__xlc__) || defined(__GNUC__) || defined(__clang__) || defined(__GNUC__) // __INTEL_COMPILER on linux
+#       define ERR_TLS(x) __thread x             // MingW, Solaris Studio C/C++, IBM XL C/C++, GNU C, Clang and Intel C++ Compiler (Linux systems)
+#   else
+#       define ERR_TLS(x) __declspec(thread) x   // Visual C++, Intel C/C++ (Windows systems), C++Builder and Digital Mars C++
+#   endif
+#endif
+extern ERR_TLS(int64_t) errno64;
 
 // Error attributes (1LL << YY)
 #define ERR_A                   (   1LL << ERR_BIT_A )
@@ -392,8 +409,6 @@ const char *strerror64( char buf[256], int64_t errno64 );
 #define ERR_jN(a,b) a##b
 #define ERR_JN(a,b) ERR_jN(a,b)
 
-
-
 #ifdef ERROR64_DEFINE_IMPLEMENTATION
 
 #include <stdint.h>
@@ -401,7 +416,7 @@ const char *strerror64( char buf[256], int64_t errno64 );
 #include <string.h>
 
 // App/user defined glossary (provided by app/user/library)
-const char *glossary( int enumeration ); 
+const char *glossary( int enumeration );
 
 // Print error to a [256] char buffer
 const char *strerror64( char buf256[256], int64_t errno64 ) {
@@ -557,413 +572,442 @@ const char *strerror64( char buf256[256], int64_t errno64 ) {
     return (buf256[255] = '\0', buf256);
 }
 
+// Print error to a [256] char buffer (extended info)
+const char *strerror64ex( char buf256[256], int64_t error64 ) {
+    if( error64 >= 0 ) {
+        sprintf( buf256, "No error ; ERR_%p", (void *)error64 );
+    } else {
+        sprintf( buf256, "%s ; ERR_%p error=%d,api=%d,rev=%d,line=%d,neg=%d,attr=%d,noun=%d",
+            strerror64(buf256, error64),
+            (void *)error64,
+            ERROR64_GET_E(error64),
+            ERROR64_GET_V(error64),
+            ERROR64_GET_R(error64),
+            ERROR64_GET_L(error64),
+            ERROR64_GET_N(error64),
+            ERROR64_GET_A(error64),
+            ERROR64_GET_U(error64)
+        );
+    }
+    return buf256;
+}
+
+ERR_TLS(int64_t) errno64 = 0;
+
 #endif // ERROR64_DEFINE_IMPLEMENTATION
 
 #ifdef __cplusplus
 }
 #endif
 
+#endif // ERROR64_H
+
 #ifdef ERROR64_BUILD_DEMO
 
 // Glossary: A few app/user-defined nouns for an imaginary game engine
 // The following enum plus the attributes above makes a total of 30300 different messages.
 enum {
-    UU_BLANK,
+    NN_BLANK,
 
-    UU_ACCESS,
-    UU_ACCOUNT,
-    UU_ADDRESS,
-    UU_ADMINISTRATOR,
-    UU_API,
-    UU_APPLICATION,
-    UU_ARCHIVE,
-    UU_ARGUMENT,
-    UU_ASSET,
-    UU_AUDIO,
-    UU_AUTHENTICATION,
-    UU_BINARY,
-    UU_BIRTHDATE,
-    UU_BLOB,
-    UU_BOX,
-    UU_BROADCAST,
-    UU_CAPSULE,
-    UU_CHECKBOX,
-    UU_CINEMATIC,
-    UU_CIRCLE,
-    UU_CLASS,
-    UU_CLIENT,
-    UU_CLOUD,
-    UU_CODE,
-    UU_COMBO,
-    UU_COMMIT,
-    UU_COMPILATION,
-    UU_COMPILER,
-    UU_COMPRESSION,
-    UU_CONTROLLER,
-    UU_COUNTRY,
-    UU_CVS,
-    UU_CYPHERING,
-    UU_DAEMON,
-    UU_DATA,
-    UU_DEPENDENCY,
-    UU_DESCRIPTOR,
-    UU_DEVICE,
-    UU_DIAGRAM,
-    UU_DIRECTORY,
-    UU_DISK,
-    UU_DLL,
-    UU_DOMAIN,
-    UU_DOWNLOAD,
-    UU_DRIVER,
-    UU_EDITOR,
-    UU_ENDPOINT,
-    UU_ENGINE,
-    UU_EVALUATION,
-    UU_EVALUATOR,
-    UU_EVENT,
-    UU_EXCEPTION,
-    UU_EXCHANGE,
-    UU_EXPECTATION,
-    UU_FETCH,
-    UU_FILE,
-    UU_FLOAT,
-    UU_FLOW,
-    UU_FOLDER,
-    UU_FONT,
-    UU_FORMAT,
-    UU_FUNCTION,
-    UU_GAME,
-    UU_GAMEPAD,
-    UU_GATEWAY,
-    UU_GEOMETRY,
-    UU_GIZMO,
-    UU_GRAPH,
-    UU_GRAPHICS,
-    UU_GROUP,
-    UU_HANDLE,
-    UU_HARDWARE,
-    UU_HEADER,
-    UU_HID,
-    UU_HMD,
-    UU_HOST,
-    UU_IDENTIFIER,
-    UU_INDEX,
-    UU_INPUT,
-    UU_INTEGER,
-    UU_INTERFACE,
-    UU_INTERVAL,
-    UU_IO,
-    UU_JOYSTICK,
-    UU_KEYBOARD,
-    UU_LENGTH,
-    UU_LEVEL,
-    UU_LIBRARY,
-    UU_LIMIT,
-    UU_LINK,
-    UU_LINKAGE,
-    UU_LINKER,
-    UU_LOCATION,
-    UU_LOGIN,
-    UU_LOOP,
-    UU_MACHINE,
-    UU_MEDIA,
-    UU_MEMORY,
-    UU_MESH,
-    UU_MESSAGE,
-    UU_METHOD,
-    UU_MODEL,
-    UU_MODULE,
-    UU_MONITOR,
-    UU_MOUSE,
-    UU_NETWORK,
-    UU_NICKNAME,
-    UU_NODE,
-    UU_NOTHING,
-    UU_NUMBER,
-    UU_OBJECT,
-    UU_OPERATION,
-    UU_OPERATOR,
-    UU_ORIENTATION,
-    UU_PACKAGE,
-    UU_PASSWORD,
-    UU_PATH,
-    UU_PATHFILE,
-    UU_PAYMENT,
-    UU_PAYWALL,
-    UU_PEER,
-    UU_PERMISSION,
-    UU_PHYSICS,
-    UU_PLATFORM,
-    UU_POSITION,
-    UU_POSTCONDITION,
-    UU_PRECONDITION,
-    UU_PROFILER,
-    UU_PROTOCOL,
-    UU_PROXY,
-    UU_QUERY,
-    UU_RANGE,
-    UU_RATIO,
-    UU_RECORD,
-    UU_RENDERER,
-    UU_REPOSITORY,
-    UU_REQUEST,
-    UU_RESOURCE,
-    UU_REVISION,
-    UU_ROTATION,
-    UU_ROUTE,
-    UU_RUNTIME,
-    UU_SCALE,
-    UU_SCREEN,
-    UU_SCRIPT,
-    UU_SEARCH,
-    UU_SEQUENCE,
-    UU_SERIALIZATION,
-    UU_SERVER,
-    UU_SERVICE,
-    UU_SHADER,
-    UU_SHAPE,
-    UU_SIZE,
-    UU_SLIDER,
-    UU_SOFTWARE,
-    UU_SOURCE,
-    UU_SPACE,
-    UU_SPHERE,
-    UU_SQUARE,
-    UU_STACK,
-    UU_STACKTRACE,
-    UU_STAGE,
-    UU_STARTPOINT,
-    UU_STREAM,
-    UU_STREAMING,
-    UU_STRING,
-    UU_STRUCT,
-    UU_SUBSYSTEM,
-    UU_SYMBOL,
-    UU_SYSTEM,
-    UU_TEXT,
-    UU_TIME,
-    UU_TOUCH,
-    UU_TRANSFORM,
-    UU_TRANSLATION,
-    UU_TRANSPORT,
-    UU_TRIGGER,
-    UU_TRUETYPE,
-    UU_TYPE,
-    UU_UPGRADE,
-    UU_UPLOAD,
-    UU_USER,
-    UU_USERNAME,
-    UU_VALUE,
-    UU_VARIANT,
-    UU_VERSION,
-    UU_VISUALIZER,
-    UU_WEBPAGE,
-    UU_WEBSITE,
-    UU_WEBVIEW,
-    UU_WIDGET,
-    UU_WINDOW,
-    UU_ZIPCODE,
+    NN_ACCESS,
+    NN_ACCOUNT,
+    NN_ADDRESS,
+    NN_ADMINISTRATOR,
+    NN_API,
+    NN_APPLICATION,
+    NN_ARCHIVE,
+    NN_ARGUMENT,
+    NN_ASSET,
+    NN_AUDIO,
+    NN_AUTHENTICATION,
+    NN_BINARY,
+    NN_BIRTHDATE,
+    NN_BLOB,
+    NN_BOX,
+    NN_BROADCAST,
+    NN_CAPSULE,
+    NN_CHECKBOX,
+    NN_CINEMATIC,
+    NN_CIRCLE,
+    NN_CLASS,
+    NN_CLIENT,
+    NN_CLOUD,
+    NN_CODE,
+    NN_COMBO,
+    NN_COMMIT,
+    NN_COMPILATION,
+    NN_COMPILER,
+    NN_COMPRESSION,
+    NN_CONTROLLER,
+    NN_COUNTRY,
+    NN_CVS,
+    NN_CYPHERING,
+    NN_DAEMON,
+    NN_DATA,
+    NN_DEPENDENCY,
+    NN_DESCRIPTOR,
+    NN_DEVICE,
+    NN_DIAGRAM,
+    NN_DIRECTORY,
+    NN_DISK,
+    NN_DLL,
+    NN_DOMAIN,
+    NN_DOWNLOAD,
+    NN_DRIVER,
+    NN_EDITOR,
+    NN_ENDPOINT,
+    NN_ENGINE,
+    NN_EVALUATION,
+    NN_EVALUATOR,
+    NN_EVENT,
+    NN_EXCEPTION,
+    NN_EXCHANGE,
+    NN_EXPECTATION,
+    NN_FETCH,
+    NN_FILE,
+    NN_FLOAT,
+    NN_FLOW,
+    NN_FOLDER,
+    NN_FONT,
+    NN_FORMAT,
+    NN_FUNCTION,
+    NN_GAME,
+    NN_GAMEPAD,
+    NN_GATEWAY,
+    NN_GEOMETRY,
+    NN_GIZMO,
+    NN_GRAPH,
+    NN_GRAPHICS,
+    NN_GROUP,
+    NN_HANDLE,
+    NN_HARDWARE,
+    NN_HEADER,
+    NN_HID,
+    NN_HMD,
+    NN_HOST,
+    NN_IDENTIFIER,
+    NN_INDEX,
+    NN_INPUT,
+    NN_INTEGER,
+    NN_INTERFACE,
+    NN_INTERVAL,
+    NN_IO,
+    NN_JOYSTICK,
+    NN_KEYBOARD,
+    NN_LENGTH,
+    NN_LEVEL,
+    NN_LIBRARY,
+    NN_LIMIT,
+    NN_LINK,
+    NN_LINKAGE,
+    NN_LINKER,
+    NN_LOCATION,
+    NN_LOGIN,
+    NN_LOOP,
+    NN_MACHINE,
+    NN_MEDIA,
+    NN_MEMORY,
+    NN_MESH,
+    NN_MESSAGE,
+    NN_METHOD,
+    NN_MODEL,
+    NN_MODULE,
+    NN_MONITOR,
+    NN_MOUSE,
+    NN_NETWORK,
+    NN_NICKNAME,
+    NN_NODE,
+    NN_NOTHING,
+    NN_NUMBER,
+    NN_OBJECT,
+    NN_OPERATION,
+    NN_OPERATOR,
+    NN_ORIENTATION,
+    NN_PACKAGE,
+    NN_PASSWORD,
+    NN_PATH,
+    NN_PATHFILE,
+    NN_PAYMENT,
+    NN_PAYWALL,
+    NN_PEER,
+    NN_PERMISSION,
+    NN_PHYSICS,
+    NN_PLATFORM,
+    NN_PLUGIN,
+    NN_POSITION,
+    NN_POSTCONDITION,
+    NN_PRECONDITION,
+    NN_PROFILER,
+    NN_PROTOCOL,
+    NN_PROXY,
+    NN_QUERY,
+    NN_RANGE,
+    NN_RATIO,
+    NN_RECORD,
+    NN_RENDERER,
+    NN_REPOSITORY,
+    NN_REQUEST,
+    NN_RESOURCE,
+    NN_REVISION,
+    NN_ROTATION,
+    NN_ROUTE,
+    NN_RUNTIME,
+    NN_SCALE,
+    NN_SCREEN,
+    NN_SCRIPT,
+    NN_SEARCH,
+    NN_SEQUENCE,
+    NN_SERIALIZATION,
+    NN_SERVER,
+    NN_SERVICE,
+    NN_SHADER,
+    NN_SHAPE,
+    NN_SIZE,
+    NN_SLIDER,
+    NN_SOFTWARE,
+    NN_SOURCE,
+    NN_SPACE,
+    NN_SPHERE,
+    NN_SQUARE,
+    NN_STACK,
+    NN_STACKTRACE,
+    NN_STAGE,
+    NN_STARTPOINT,
+    NN_STREAM,
+    NN_STREAMING,
+    NN_STRING,
+    NN_STRUCT,
+    NN_SUBSYSTEM,
+    NN_SYMBOL,
+    NN_SYSTEM,
+    NN_TEXT,
+    NN_TIME,
+    NN_TOUCH,
+    NN_TRANSFORM,
+    NN_TRANSLATION,
+    NN_TRANSPORT,
+    NN_TRIGGER,
+    NN_TRUETYPE,
+    NN_TYPE,
+    NN_UPGRADE,
+    NN_UPLOAD,
+    NN_USER,
+    NN_USERNAME,
+    NN_VALUE,
+    NN_VARIANT,
+    NN_VERSION,
+    NN_VISUALIZER,
+    NN_WEBPAGE,
+    NN_WEBSITE,
+    NN_WEBVIEW,
+    NN_WIDGET,
+    NN_WINDOW,
+    NN_ZIPCODE,
 };
 
 // This function is used to resolve the enum above
+#ifdef __cplusplus
+extern "C"
+#endif
 const char *glossary( int enumeration ) {
     switch( enumeration ) {
-        case UU_BLANK: return "";
+        case NN_BLANK: return "";
         default:  return "??";
 
-        case UU_ACCESS: return "ACCESS";
-        case UU_ACCOUNT: return "ACCOUNT";
-        case UU_ADDRESS: return "ADDRESS";
-        case UU_ADMINISTRATOR: return "ADMINISTRATOR";
-        case UU_API: return "API";
-        case UU_APPLICATION: return "APPLICATION";
-        case UU_ARCHIVE: return "ARCHIVE";
-        case UU_ARGUMENT: return "ARGUMENT";
-        case UU_ASSET: return "ASSET";
-        case UU_AUDIO: return "AUDIO";
-        case UU_AUTHENTICATION: return "AUTHENTICATION";
-        case UU_BINARY: return "BINARY";
-        case UU_BIRTHDATE: return "BIRTHDATE";
-        case UU_BLOB: return "BLOB";
-        case UU_BOX: return "BOX";
-        case UU_BROADCAST: return "BROADCAST";
-        case UU_CAPSULE: return "CAPSULE";
-        case UU_CHECKBOX: return "CHECKBOX";
-        case UU_CINEMATIC: return "CINEMATIC";
-        case UU_CIRCLE: return "CIRCLE";
-        case UU_CLASS: return "CLASS";
-        case UU_CLIENT: return "CLIENT";
-        case UU_CLOUD: return "CLOUD";
-        case UU_CODE: return "CODE";
-        case UU_COMBO: return "COMBO";
-        case UU_COMMIT: return "COMMIT";
-        case UU_COMPILATION: return "COMPILATION";
-        case UU_COMPILER: return "COMPILER";
-        case UU_COMPRESSION: return "COMPRESSION";
-        case UU_CONTROLLER: return "CONTROLLER";
-        case UU_COUNTRY: return "COUNTRY";
-        case UU_CVS: return "CVS";
-        case UU_CYPHERING: return "CYPHERING";
-        case UU_DAEMON: return "DAEMON";
-        case UU_DATA: return "DATA";
-        case UU_DEPENDENCY: return "DEPENDENCY";
-        case UU_DESCRIPTOR: return "DESCRIPTOR";
-        case UU_DEVICE: return "DEVICE";
-        case UU_DIAGRAM: return "DIAGRAM";
-        case UU_DIRECTORY: return "DIRECTORY";
-        case UU_DISK: return "DISK";
-        case UU_DLL: return "DLL";
-        case UU_DOMAIN: return "DOMAIN";
-        case UU_DOWNLOAD: return "DOWNLOAD";
-        case UU_DRIVER: return "DRIVER";
-        case UU_EDITOR: return "EDITOR";
-        case UU_ENDPOINT: return "ENDPOINT";
-        case UU_ENGINE: return "ENGINE";
-        case UU_EVALUATION: return "EVALUATION";
-        case UU_EVALUATOR: return "EVALUATOR";
-        case UU_EVENT: return "EVENT";
-        case UU_EXCEPTION: return "EXCEPTION";
-        case UU_EXCHANGE: return "EXCHANGE";
-        case UU_EXPECTATION: return "EXPECTATION";
-        case UU_FETCH: return "FETCH";
-        case UU_FILE: return "FILE";
-        case UU_FLOAT: return "FLOAT";
-        case UU_FLOW: return "FLOW";
-        case UU_FOLDER: return "FOLDER";
-        case UU_FONT: return "FONT";
-        case UU_FORMAT: return "FORMAT";
-        case UU_FUNCTION: return "FUNCTION";
-        case UU_GAME: return "GAME";
-        case UU_GAMEPAD: return "GAMEPAD";
-        case UU_GATEWAY: return "GATEWAY";
-        case UU_GEOMETRY: return "GEOMETRY";
-        case UU_GIZMO: return "GIZMO";
-        case UU_GRAPH: return "GRAPH";
-        case UU_GRAPHICS: return "GRAPHICS";
-        case UU_GROUP: return "GROUP";
-        case UU_HANDLE: return "HANDLE";
-        case UU_HARDWARE: return "HARDWARE";
-        case UU_HEADER: return "HEADER";
-        case UU_HID: return "HID";
-        case UU_HMD: return "HMD";
-        case UU_HOST: return "HOST";
-        case UU_IDENTIFIER: return "IDENTIFIER";
-        case UU_INDEX: return "INDEX";
-        case UU_INPUT: return "INPUT";
-        case UU_INTEGER: return "INTEGER";
-        case UU_INTERFACE: return "INTERFACE";
-        case UU_INTERVAL: return "INTERVAL";
-        case UU_IO: return "IO";
-        case UU_JOYSTICK: return "JOYSTICK";
-        case UU_KEYBOARD: return "KEYBOARD";
-        case UU_LENGTH: return "LENGTH";
-        case UU_LEVEL: return "LEVEL";
-        case UU_LIBRARY: return "LIBRARY";
-        case UU_LIMIT: return "LIMIT";
-        case UU_LINK: return "LINK";
-        case UU_LINKAGE: return "LINKAGE";
-        case UU_LINKER: return "LINKER";
-        case UU_LOCATION: return "LOCATION";
-        case UU_LOGIN: return "LOGIN";
-        case UU_LOOP: return "LOOP";
-        case UU_MACHINE: return "MACHINE";
-        case UU_MEDIA: return "MEDIA";
-        case UU_MEMORY: return "MEMORY";
-        case UU_MESH: return "MESH";
-        case UU_MESSAGE: return "MESSAGE";
-        case UU_METHOD: return "METHOD";
-        case UU_MODEL: return "MODEL";
-        case UU_MODULE: return "MODULE";
-        case UU_MONITOR: return "MONITOR";
-        case UU_MOUSE: return "MOUSE";
-        case UU_NETWORK: return "NETWORK";
-        case UU_NICKNAME: return "NICKNAME";
-        case UU_NODE: return "NODE";
-        case UU_NOTHING: return "NOTHING";
-        case UU_NUMBER: return "NUMBER";
-        case UU_OBJECT: return "OBJECT";
-        case UU_OPERATION: return "OPERATION";
-        case UU_OPERATOR: return "OPERATOR";
-        case UU_ORIENTATION: return "ORIENTATION";
-        case UU_PACKAGE: return "PACKAGE";
-        case UU_PASSWORD: return "PASSWORD";
-        case UU_PATH: return "PATH";
-        case UU_PATHFILE: return "PATHFILE";
-        case UU_PAYMENT: return "PAYMENT";
-        case UU_PAYWALL: return "PAYWALL";
-        case UU_PEER: return "PEER";
-        case UU_PERMISSION: return "PERMISSION";
-        case UU_PHYSICS: return "PHYSICS";
-        case UU_PLATFORM: return "PLATFORM";
-        case UU_POSITION: return "POSITION";
-        case UU_POSTCONDITION: return "POSTCONDITION";
-        case UU_PRECONDITION: return "PRECONDITION";
-        case UU_PROFILER: return "PROFILER";
-        case UU_PROTOCOL: return "PROTOCOL";
-        case UU_PROXY: return "PROXY";
-        case UU_QUERY: return "QUERY";
-        case UU_RANGE: return "RANGE";
-        case UU_RATIO: return "RATIO";
-        case UU_RECORD: return "RECORD";
-        case UU_RENDERER: return "RENDERER";
-        case UU_REPOSITORY: return "REPOSITORY";
-        case UU_REQUEST: return "REQUEST";
-        case UU_RESOURCE: return "RESOURCE";
-        case UU_REVISION: return "REVISION";
-        case UU_ROTATION: return "ROTATION";
-        case UU_ROUTE: return "ROUTE";
-        case UU_RUNTIME: return "RUNTIME";
-        case UU_SCALE: return "SCALE";
-        case UU_SCREEN: return "SCREEN";
-        case UU_SCRIPT: return "SCRIPT";
-        case UU_SEARCH: return "SEARCH";
-        case UU_SEQUENCE: return "SEQUENCE";
-        case UU_SERIALIZATION: return "SERIALIZATION";
-        case UU_SERVER: return "SERVER";
-        case UU_SERVICE: return "SERVICE";
-        case UU_SHADER: return "SHADER";
-        case UU_SHAPE: return "SHAPE";
-        case UU_SIZE: return "SIZE";
-        case UU_SLIDER: return "SLIDER";
-        case UU_SOFTWARE: return "SOFTWARE";
-        case UU_SOURCE: return "SOURCE";
-        case UU_SPACE: return "SPACE";
-        case UU_SPHERE: return "SPHERE";
-        case UU_SQUARE: return "SQUARE";
-        case UU_STACK: return "STACK";
-        case UU_STACKTRACE: return "STACKTRACE";
-        case UU_STAGE: return "STAGE";
-        case UU_STARTPOINT: return "STARTPOINT";
-        case UU_STREAM: return "STREAM";
-        case UU_STREAMING: return "STREAMING";
-        case UU_STRING: return "STRING";
-        case UU_STRUCT: return "STRUCT";
-        case UU_SUBSYSTEM: return "SUBSYSTEM";
-        case UU_SYMBOL: return "SYMBOL";
-        case UU_SYSTEM: return "SYSTEM";
-        case UU_TEXT: return "TEXT";
-        case UU_TIME: return "TIME";
-        case UU_TOUCH: return "TOUCH";
-        case UU_TRANSFORM: return "TRANSFORM";
-        case UU_TRANSLATION: return "TRANSLATION";
-        case UU_TRANSPORT: return "TRANSPORT";
-        case UU_TRIGGER: return "TRIGGER";
-        case UU_TRUETYPE: return "TRUETYPE";
-        case UU_TYPE: return "TYPE";
-        case UU_UPGRADE: return "UPGRADE";
-        case UU_UPLOAD: return "UPLOAD";
-        case UU_USER: return "USER";
-        case UU_USERNAME: return "USERNAME";
-        case UU_VALUE: return "VALUE";
-        case UU_VARIANT: return "VARIANT";
-        case UU_VERSION: return "VERSION";
-        case UU_VISUALIZER: return "VISUALIZER";
-        case UU_WEBPAGE: return "WEBPAGE";
-        case UU_WEBSITE: return "WEBSITE";
-        case UU_WEBVIEW: return "WEBVIEW";
-        case UU_WIDGET: return "WIDGET";
-        case UU_WINDOW: return "WINDOW";
-        case UU_ZIPCODE: return "ZIPCODE";
+        case NN_ACCESS: return "ACCESS";
+        case NN_ACCOUNT: return "ACCOUNT";
+        case NN_ADDRESS: return "ADDRESS";
+        case NN_ADMINISTRATOR: return "ADMINISTRATOR";
+        case NN_API: return "API";
+        case NN_APPLICATION: return "APPLICATION";
+        case NN_ARCHIVE: return "ARCHIVE";
+        case NN_ARGUMENT: return "ARGUMENT";
+        case NN_ASSET: return "ASSET";
+        case NN_AUDIO: return "AUDIO";
+        case NN_AUTHENTICATION: return "AUTHENTICATION";
+        case NN_BINARY: return "BINARY";
+        case NN_BIRTHDATE: return "BIRTHDATE";
+        case NN_BLOB: return "BLOB";
+        case NN_BOX: return "BOX";
+        case NN_BROADCAST: return "BROADCAST";
+        case NN_CAPSULE: return "CAPSULE";
+        case NN_CHECKBOX: return "CHECKBOX";
+        case NN_CINEMATIC: return "CINEMATIC";
+        case NN_CIRCLE: return "CIRCLE";
+        case NN_CLASS: return "CLASS";
+        case NN_CLIENT: return "CLIENT";
+        case NN_CLOUD: return "CLOUD";
+        case NN_CODE: return "CODE";
+        case NN_COMBO: return "COMBO";
+        case NN_COMMIT: return "COMMIT";
+        case NN_COMPILATION: return "COMPILATION";
+        case NN_COMPILER: return "COMPILER";
+        case NN_COMPRESSION: return "COMPRESSION";
+        case NN_CONTROLLER: return "CONTROLLER";
+        case NN_COUNTRY: return "COUNTRY";
+        case NN_CVS: return "CVS";
+        case NN_CYPHERING: return "CYPHERING";
+        case NN_DAEMON: return "DAEMON";
+        case NN_DATA: return "DATA";
+        case NN_DEPENDENCY: return "DEPENDENCY";
+        case NN_DESCRIPTOR: return "DESCRIPTOR";
+        case NN_DEVICE: return "DEVICE";
+        case NN_DIAGRAM: return "DIAGRAM";
+        case NN_DIRECTORY: return "DIRECTORY";
+        case NN_DISK: return "DISK";
+        case NN_DLL: return "DLL";
+        case NN_DOMAIN: return "DOMAIN";
+        case NN_DOWNLOAD: return "DOWNLOAD";
+        case NN_DRIVER: return "DRIVER";
+        case NN_EDITOR: return "EDITOR";
+        case NN_ENDPOINT: return "ENDPOINT";
+        case NN_ENGINE: return "ENGINE";
+        case NN_EVALUATION: return "EVALUATION";
+        case NN_EVALUATOR: return "EVALUATOR";
+        case NN_EVENT: return "EVENT";
+        case NN_EXCEPTION: return "EXCEPTION";
+        case NN_EXCHANGE: return "EXCHANGE";
+        case NN_EXPECTATION: return "EXPECTATION";
+        case NN_FETCH: return "FETCH";
+        case NN_FILE: return "FILE";
+        case NN_FLOAT: return "FLOAT";
+        case NN_FLOW: return "FLOW";
+        case NN_FOLDER: return "FOLDER";
+        case NN_FONT: return "FONT";
+        case NN_FORMAT: return "FORMAT";
+        case NN_FUNCTION: return "FUNCTION";
+        case NN_GAME: return "GAME";
+        case NN_GAMEPAD: return "GAMEPAD";
+        case NN_GATEWAY: return "GATEWAY";
+        case NN_GEOMETRY: return "GEOMETRY";
+        case NN_GIZMO: return "GIZMO";
+        case NN_GRAPH: return "GRAPH";
+        case NN_GRAPHICS: return "GRAPHICS";
+        case NN_GROUP: return "GROUP";
+        case NN_HANDLE: return "HANDLE";
+        case NN_HARDWARE: return "HARDWARE";
+        case NN_HEADER: return "HEADER";
+        case NN_HID: return "HID";
+        case NN_HMD: return "HMD";
+        case NN_HOST: return "HOST";
+        case NN_IDENTIFIER: return "IDENTIFIER";
+        case NN_INDEX: return "INDEX";
+        case NN_INPUT: return "INPUT";
+        case NN_INTEGER: return "INTEGER";
+        case NN_INTERFACE: return "INTERFACE";
+        case NN_INTERVAL: return "INTERVAL";
+        case NN_IO: return "IO";
+        case NN_JOYSTICK: return "JOYSTICK";
+        case NN_KEYBOARD: return "KEYBOARD";
+        case NN_LENGTH: return "LENGTH";
+        case NN_LEVEL: return "LEVEL";
+        case NN_LIBRARY: return "LIBRARY";
+        case NN_LIMIT: return "LIMIT";
+        case NN_LINK: return "LINK";
+        case NN_LINKAGE: return "LINKAGE";
+        case NN_LINKER: return "LINKER";
+        case NN_LOCATION: return "LOCATION";
+        case NN_LOGIN: return "LOGIN";
+        case NN_LOOP: return "LOOP";
+        case NN_MACHINE: return "MACHINE";
+        case NN_MEDIA: return "MEDIA";
+        case NN_MEMORY: return "MEMORY";
+        case NN_MESH: return "MESH";
+        case NN_MESSAGE: return "MESSAGE";
+        case NN_METHOD: return "METHOD";
+        case NN_MODEL: return "MODEL";
+        case NN_MODULE: return "MODULE";
+        case NN_MONITOR: return "MONITOR";
+        case NN_MOUSE: return "MOUSE";
+        case NN_NETWORK: return "NETWORK";
+        case NN_NICKNAME: return "NICKNAME";
+        case NN_NODE: return "NODE";
+        case NN_NOTHING: return "NOTHING";
+        case NN_NUMBER: return "NUMBER";
+        case NN_OBJECT: return "OBJECT";
+        case NN_OPERATION: return "OPERATION";
+        case NN_OPERATOR: return "OPERATOR";
+        case NN_ORIENTATION: return "ORIENTATION";
+        case NN_PACKAGE: return "PACKAGE";
+        case NN_PASSWORD: return "PASSWORD";
+        case NN_PATH: return "PATH";
+        case NN_PATHFILE: return "PATHFILE";
+        case NN_PAYMENT: return "PAYMENT";
+        case NN_PAYWALL: return "PAYWALL";
+        case NN_PEER: return "PEER";
+        case NN_PERMISSION: return "PERMISSION";
+        case NN_PHYSICS: return "PHYSICS";
+        case NN_PLATFORM: return "PLATFORM";
+        case NN_PLUGIN: return "PLUGIN";
+        case NN_POSITION: return "POSITION";
+        case NN_POSTCONDITION: return "POSTCONDITION";
+        case NN_PRECONDITION: return "PRECONDITION";
+        case NN_PROFILER: return "PROFILER";
+        case NN_PROTOCOL: return "PROTOCOL";
+        case NN_PROXY: return "PROXY";
+        case NN_QUERY: return "QUERY";
+        case NN_RANGE: return "RANGE";
+        case NN_RATIO: return "RATIO";
+        case NN_RECORD: return "RECORD";
+        case NN_RENDERER: return "RENDERER";
+        case NN_REPOSITORY: return "REPOSITORY";
+        case NN_REQUEST: return "REQUEST";
+        case NN_RESOURCE: return "RESOURCE";
+        case NN_REVISION: return "REVISION";
+        case NN_ROTATION: return "ROTATION";
+        case NN_ROUTE: return "ROUTE";
+        case NN_RUNTIME: return "RUNTIME";
+        case NN_SCALE: return "SCALE";
+        case NN_SCREEN: return "SCREEN";
+        case NN_SCRIPT: return "SCRIPT";
+        case NN_SEARCH: return "SEARCH";
+        case NN_SEQUENCE: return "SEQUENCE";
+        case NN_SERIALIZATION: return "SERIALIZATION";
+        case NN_SERVER: return "SERVER";
+        case NN_SERVICE: return "SERVICE";
+        case NN_SHADER: return "SHADER";
+        case NN_SHAPE: return "SHAPE";
+        case NN_SIZE: return "SIZE";
+        case NN_SLIDER: return "SLIDER";
+        case NN_SOFTWARE: return "SOFTWARE";
+        case NN_SOURCE: return "SOURCE";
+        case NN_SPACE: return "SPACE";
+        case NN_SPHERE: return "SPHERE";
+        case NN_SQUARE: return "SQUARE";
+        case NN_STACK: return "STACK";
+        case NN_STACKTRACE: return "STACKTRACE";
+        case NN_STAGE: return "STAGE";
+        case NN_STARTPOINT: return "STARTPOINT";
+        case NN_STREAM: return "STREAM";
+        case NN_STREAMING: return "STREAMING";
+        case NN_STRING: return "STRING";
+        case NN_STRUCT: return "STRUCT";
+        case NN_SUBSYSTEM: return "SUBSYSTEM";
+        case NN_SYMBOL: return "SYMBOL";
+        case NN_SYSTEM: return "SYSTEM";
+        case NN_TEXT: return "TEXT";
+        case NN_TIME: return "TIME";
+        case NN_TOUCH: return "TOUCH";
+        case NN_TRANSFORM: return "TRANSFORM";
+        case NN_TRANSLATION: return "TRANSLATION";
+        case NN_TRANSPORT: return "TRANSPORT";
+        case NN_TRIGGER: return "TRIGGER";
+        case NN_TRUETYPE: return "TRUETYPE";
+        case NN_TYPE: return "TYPE";
+        case NN_UPGRADE: return "UPGRADE";
+        case NN_UPLOAD: return "UPLOAD";
+        case NN_USER: return "USER";
+        case NN_USERNAME: return "USERNAME";
+        case NN_VALUE: return "VALUE";
+        case NN_VARIANT: return "VARIANT";
+        case NN_VERSION: return "VERSION";
+        case NN_VISUALIZER: return "VISUALIZER";
+        case NN_WEBPAGE: return "WEBPAGE";
+        case NN_WEBSITE: return "WEBSITE";
+        case NN_WEBVIEW: return "WEBVIEW";
+        case NN_WIDGET: return "WIDGET";
+        case NN_WINDOW: return "WINDOW";
+        case NN_ZIPCODE: return "ZIPCODE";
     }
 }
 
@@ -972,8 +1016,15 @@ const char *glossary( int enumeration ) {
 #include <string.h>
 
 int main() {
-#   define TEST(errcode, str) ( strerror64(buf256, errcode), printf("[%s] %s\n", strcmp(str,buf256) ? "FAIL" : " OK ", buf256) )
     char buf256[256];
+
+    // simplest case: errno64 showcase
+    errno64 = ERROR64(NN_SERVICE | ERR_NOT_AVAILABLE);
+    printf(">> %s\n", strerror64(buf256, errno64) );
+    printf(">> %s\n", strerror64ex(buf256, errno64) );
+
+//  test suite {
+#   define TEST(errcode, str) ( strerror64(buf256, errcode), printf("[%s] %s\n", strcmp(str,buf256) ? "FAIL" : " OK ", buf256) )
 
     // simple attributes
     TEST( ERROR64(ERR_NOT_ALLOWED), "NOT ALLOWED");
@@ -985,27 +1036,28 @@ int main() {
     TEST( ERROR64(ERR_NOT | ERR_AVAILABLE), "NOT AVAILABLE");
 
     // app-defined nouns + attributes
-    TEST( ERROR64(UU_MEMORY | ERR_OUT_OF_RANGE), "MEMORY OUT OF RANGE");
-    TEST( ERROR64(UU_STACK | ERR_OVERFLOW), "STACK OVERFLOW");
-    TEST( ERROR64(UU_EXCEPTION | ERR_THROWN), "EXCEPTION THROWN");
-    TEST( ERROR64(UU_DISK | ERR_FULL), "DISK FULL");
-    TEST( ERROR64(UU_FILE | ERR_NOT_FOUND), "FILE NOT FOUND" );
-    TEST( ERROR64(UU_PROTOCOL | ERR_NOT_AVAILABLE), "PROTOCOL NOT AVAILABLE");
-    TEST( ERROR64(UU_CLIENT | ERR_NOT_AUTHORIZED), "CLIENT NOT AUTHORIZED");
-    TEST( ERROR64(UU_USER | ERR_NOT_REGISTERED), "USER NOT REGISTERED");
-    TEST( ERROR64(UU_REPOSITORY | ERR_NOT_CREATED), "REPOSITORY NOT CREATED");
-    TEST( ERROR64(UU_WEBSITE | ERR_NOT_RESPONDING), "WEBSITE NOT RESPONDING");
-    TEST( ERROR64(UU_WIDGET | ERR_TOO_COMPLEX), "WIDGET TOO COMPLEX");
+    TEST( ERROR64(NN_MEMORY | ERR_OUT_OF_RANGE), "MEMORY OUT OF RANGE");
+    TEST( ERROR64(NN_STACK | ERR_OVERFLOW), "STACK OVERFLOW");
+    TEST( ERROR64(NN_EXCEPTION | ERR_THROWN), "EXCEPTION THROWN");
+    TEST( ERROR64(NN_DISK | ERR_FULL), "DISK FULL");
+    TEST( ERROR64(NN_FILE | ERR_NOT_FOUND), "FILE NOT FOUND" );
+    TEST( ERROR64(NN_PROTOCOL | ERR_NOT_AVAILABLE), "PROTOCOL NOT AVAILABLE");
+    TEST( ERROR64(NN_CLIENT | ERR_NOT_AUTHORIZED), "CLIENT NOT AUTHORIZED");
+    TEST( ERROR64(NN_USER | ERR_NOT_REGISTERED), "USER NOT REGISTERED");
+    TEST( ERROR64(NN_REPOSITORY | ERR_NOT_CREATED), "REPOSITORY NOT CREATED");
+    TEST( ERROR64(NN_WEBSITE | ERR_NOT_RESPONDING), "WEBSITE NOT RESPONDING");
+    TEST( ERROR64(NN_WIDGET | ERR_TOO_COMPLEX), "WIDGET TOO COMPLEX");
 
     // app-defined nouns + composed attributes
-    TEST( ERROR64(ERR_NOT | ERR_A | UU_DIRECTORY), "NOT A DIRECTORY" );
-    TEST( ERROR64(ERR_NOT | ERR_ENOUGH | UU_SPACE), "NOT ENOUGH SPACE" );
+    TEST( ERROR64(ERR_NOT | ERR_A | NN_DIRECTORY), "NOT A DIRECTORY" );
+    TEST( ERROR64(ERR_NOT | ERR_ENOUGH | NN_SPACE), "NOT ENOUGH SPACE" );
 
     // non-errors (positive numbers) must not resolve
     TEST( 0, "" );
     TEST( 1, "" );
 
     puts("[ OK ] Done.");
+// }
 }
 
 #endif
